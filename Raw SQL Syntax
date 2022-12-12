@@ -1,0 +1,265 @@
+CREATE DATABASE Nashville_Housing;
+
+USE Nashville_Housing;
+
+
+/* 
+
+Cleaning Data in SQL Queries
+
+*/
+
+
+
+
+--Let's check what have we got in this dataset.
+
+SELECT *
+FROM NashvilleHousing;
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+/*
+
+1) Standardise Date Format
+
+*/
+
+-- Currently, the SaleDate has the data type 'DATETIME' and contains the timestamp which is irrelevant here.
+-- So, I'll convert it into 'DATE' to get rid of the timestamp. 
+
+UPDATE NashvilleHousing
+SET SaleDate = CONVERT(Date,SaleDate);
+
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+/*
+
+2) Populate Property Address data
+
+*/
+
+SELECT *
+FROM NashvilleHousing
+WHERE PropertyAddress IS NULL;
+
+-- Thus, we have a few properties whose addresses are null in the dataset.
+-- After a little bit of exploring the dataset, I realized that properties having the same 'ParcelId' have the same 'PropertyAddress'. So, what we can do is for
+-- the properties with null 'PropertyAddress' but a matching 'ParcelId' with some other property, we can fill the same 'PropertyAddress' as that of the matching Property.
+
+-- This can be done using Self Join.
+
+-- Fetching relevant PropertyAddresses where the column is null, using Self Join
+
+-- Here, we join the table NashvilleHousing with itself where the ParcelID are same but the UniqueID are different.
+
+
+SELECT a.ParcelID,a.PropertyAddress,b.ParcelID,b.PropertyAddress,ISNULL(a.PropertyAddress,b.PropertyAddress) AS required_address
+FROM NashvilleHousing a
+JOIN NashvilleHousing b
+ON a.ParcelID = b.ParcelID AND a.[UniqueID ] <> b.[UniqueID ]
+WHERE a.PropertyAddress IS NULL
+
+
+-- Filling the Null Rows with Relevant Values
+
+
+UPDATE a
+SET PropertyAddress = ISNULL(a.PropertyAddress,b.PropertyAddress)
+FROM NashvilleHousing a
+JOIN NashvilleHousing b
+ON a.ParcelID = b.ParcelID AND a.[UniqueID ] <> b.[UniqueID ]
+WHERE a.PropertyAddress IS NULL
+
+SELECT COUNT(*) AS null_count
+FROM NashvilleHousing
+WHERE PropertyAddress IS NULL;
+
+-- Now we can see, there are no properties with vacant PropertyAddress column.
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+/* 
+
+3) Breaking Out Address into Individual Columns (Address and City)
+
+*/
+
+-- Starting Out with PropertyAddress
+
+
+SELECT PropertyAddress
+FROM NashvilleHousing;
+
+-- AS we can see, there is a comma acting as a delimiter between the Address and the City Name in all the rows. Also, there are no other commas except for this one.
+-- So, we can use SUBSTRING with CHARINDEX to divide 'PropertyAddress' into 'Address' and 'City'.
+
+
+-- Specifying what do we want
+
+
+SELECT 
+SUBSTRING(PropertyAddress,1,CHARINDEX(',',PropertyAddress)-1) AS Address,
+SUBSTRING(PropertyAddress,CHARINDEX(',',PropertyAddress)+1,LEN(PropertyAddress)) AS City
+FROM NashvilleHousing
+
+
+-- Adding 2 new columns to the table
+
+
+ALTER TABLE NashvilleHousing
+ADD PropertyAddressNew NVARCHAR(255);
+
+ALTER TABLE NashvilleHousing
+ADD PropertyCity NVARCHAR(255);
+
+
+
+-- Filling those 2 new columns with the relevant values
+
+
+UPDATE NashvilleHousing
+SET PropertyAddressNew = SUBSTRING(PropertyAddress,1,CHARINDEX(',',PropertyAddress)-1) FROM NashvilleHousing;
+
+UPDATE NashvilleHousing
+SET PropertyCity = SUBSTRING(PropertyAddress,CHARINDEX(',',PropertyAddress)+1,LEN(PropertyAddress));
+
+
+
+-- Splitting the OwnerAddress column now
+
+-- The same can be done for the column OwnerAddress. It can be split into Address, City and the State.
+-- This time we'll do it using a function called PARSENAME(). 
+-- PARSENAME() can extract substrings from a string given the substrings are separated by Periods. Here, we have comma as the delimiter. So, we'll use REPLACE() to substitute the comma with a period.
+
+
+
+Select OwnerAddress from NashvilleHousing;
+
+
+-- Specifying what we want
+
+
+SELECT 
+PARSENAME(REPLACE(OwnerAddress,',','.'),3) Address,
+PARSENAME(REPLACE(OwnerAddress,',','.'),2) City,
+PARSENAME(REPLACE(OwnerAddress,',','.'),1) State
+FROM NashvilleHousing;
+
+
+-- Adding 3 new columns 
+
+
+ALTER TABLE NashvilleHousing
+ADD OwnerAddressNew NVARCHAR(255);
+
+ALTER TABLE NashvilleHousing
+ADD OwnerCity NVARCHAR(255);
+
+ALTER TABLE NashvilleHousing
+ADD OwnerState NVARCHAR(255);
+
+
+-- Filling the 3 columns with relevant values
+
+
+UPDATE NashvilleHousing
+SET OwnerAddressNew = PARSENAME(REPLACE(OwnerAddress,',','.'),3);
+
+UPDATE NashvilleHousing
+SET OwnerCity = PARSENAME(REPLACE(OwnerAddress,',','.'),2);
+
+UPDATE NashvilleHousing 
+SET OwnerState = PARSENAME(REPLACE(OwnerAddress,',','.'),1);
+
+SELECT * FROM NashvilleHousing
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+/* 
+
+4) Change Y and N to Yes and No in 'Sold as Vacant' field
+
+*/
+
+
+
+-- Checking what all values are there in SoldAsVacant Column
+
+
+SELECT DISTINCT (SoldAsVacant)
+FROM NashvilleHousing
+
+
+-- Making relevant changes
+
+
+UPDATE NashvilleHousing
+SET SoldAsVacant = CASE WHEN SoldAsVacant = 'Y' THEN 'Yes'
+				   WHEN SoldAsVacant = 'N' THEN 'No'
+				   ELSE SoldAsVacant
+				   END;
+
+
+------------------------------------------------------------------------------------------------------------------------
+
+/*
+
+Remove Duplicates
+
+*/
+
+-- Identifying duplicates using Row_Number function and CTE
+-- Deleting duplicates
+
+
+With RowNumcte AS
+(SELECT  * ,
+ROW_NUMBER() OVER(
+PARTITION BY ParcelID,
+			PropertyAddress,
+			SaleDate,
+			SaLePrice,
+			LegalReference
+			ORDER BY UniqueID) Rownum
+FROM NashvilleHousing) 
+DELETE
+FROM RowNumcte
+WHERE Rownum>1
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+/*
+
+Delete Unused Columns
+
+*/
+
+-- As we already have the address,city and state as individual columns from the 'PropertyAddress' and 'OwnerAddress', we're gonna drop these two.
+-- Also, TaxDistrict doesn't seem to serve much purpose here, so we'll delete that too.
+
+ALTER TABLE NashvilleHousing
+DROP COLUMN PropertyAddress,OwnerAddress,TaxDistrict;
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- Have a final look at the Cleaned Data
+
+SELECT * 
+FROM NashvilleHousing; 
+
+
+
+
+
+
+
+
+
+
