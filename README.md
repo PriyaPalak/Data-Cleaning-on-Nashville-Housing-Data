@@ -12,7 +12,7 @@ There is no one absolute way to define the steps involved in the process of data
 - Validity
 - Consistency
 - Uniqueness
-- Relevancy
+
 
 ## About the Dataset
 
@@ -215,9 +215,9 @@ FROM NashvilleHousing
 ````sql
 UPDATE NashvilleHousing
 SET SoldAsVacant = CASE WHEN SoldAsVacant = 'Y' THEN 'Yes'
-				   WHEN SoldAsVacant = 'N' THEN 'No'
-				   ELSE SoldAsVacant
-				   END;
+			WHEN SoldAsVacant = 'N' THEN 'No'
+			ELSE SoldAsVacant
+			END;
 ````
 
 ### 5. Removing Duplicates (Uniqueness)
