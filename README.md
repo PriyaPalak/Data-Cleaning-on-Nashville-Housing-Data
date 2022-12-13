@@ -25,7 +25,7 @@ It contains more than **56000** rows and **31** columns. The attributes included
 
 The dataset is present in the form of an Excel File. I imported it in the SQL Server to continue with the process of Data Cleaning.
 
-#### 1. Standardising the Date Format
+### 1. Standardising the Date Format
 
 Currently, the `SaleDate` has the data type **DATETIME** and contains the timestamp which is irrelevant here.
 So, I'll convert it into **DATE** to get rid of the timestamp.
@@ -43,7 +43,7 @@ SET SaleDate = CONVERT(Date,SaleDate);
 
 ![NH 1 Cleaned](https://user-images.githubusercontent.com/96012488/207055312-013b8e3f-0486-446e-8b34-126a0418559f.png)
 
-#### 2. Populating null Property Address values
+### 2. Populating null Property Address values
 
 ````sql
 SELECT *
@@ -91,12 +91,108 @@ ON a.ParcelID = b.ParcelID AND a.[UniqueID ] <> b.[UniqueID ]
 WHERE a.PropertyAddress IS NULL
 ````
 
-- Now, we do not have any null values in the `PropertyAddress` column.
+- Now we can see, there are no properties with vacant PropertyAddress column.
 
 ![NH 2 Cleaned (2)](https://user-images.githubusercontent.com/96012488/207057526-aa7e232d-6e9a-4725-bd55-fad84d4814db.png)
 
+### 3. Breaking Out Address into Individual Columns (Address, City and State)
+
+-  Starting Out with `PropertyAddress`
+
+````sql
+SELECT PropertyAddress
+FROM NashvilleHousing;
+````
+
+**Before:**
+
+![NH 3 Uncleaned ](https://user-images.githubusercontent.com/96012488/207066771-a3fe0f20-babc-4c0a-87c9-44dbdedc69bc.png)
+
+- As we can see, there is a comma acting as a delimiter between the Address and the City Name in all the rows. Also, there are no other commas except for this one.
+So, we can use **SUBSTRING** with **CHARINDEX** to divide `PropertyAddress` into `Address` and `City`.
+
+➡️ Specifying what do we want
+
+````sql
+SELECT 
+SUBSTRING(PropertyAddress,1,CHARINDEX(',',PropertyAddress)-1) AS Address,
+SUBSTRING(PropertyAddress,CHARINDEX(',',PropertyAddress)+1,LEN(PropertyAddress)) AS City
+FROM NashvilleHousing
+````
+
+![NH 3 Cleaned (1)](https://user-images.githubusercontent.com/96012488/207067947-b95e61fd-e142-4362-85f0-200afc998cb0.png)
 
 
+➡️ Adding 2 new columns to the table
+
+````sql
+ALTER TABLE NashvilleHousing
+ADD PropertyAddressNew NVARCHAR(255);
+
+ALTER TABLE NashvilleHousing
+ADD PropertyCity NVARCHAR(255);
+````
+
+➡️ Filling those 2 new columns with the relevant values
+
+````sql
+UPDATE NashvilleHousing
+SET PropertyAddressNew = SUBSTRING(PropertyAddress,1,CHARINDEX(',',PropertyAddress)-1) FROM NashvilleHousing;
+
+UPDATE NashvilleHousing
+SET PropertyCity = SUBSTRING(PropertyAddress,CHARINDEX(',',PropertyAddress)+1,LEN(PropertyAddress));
+````
+
+![NH 3 Cleaned ](https://user-images.githubusercontent.com/96012488/207068020-edfecc8d-bc19-48b0-8679-916346b6e885.png)
+
+- Splitting the 'OwnerAddress' column now
+
+- The same can be done for the column `OwnerAddress`. It contains three pieces of information: `Address`, `City` and the `State`.
+- This time we'll do it using a function called **PARSENAME()**. 
+- PARSENAME() can extract substrings from a string given the substrings are separated by Periods. Here, we have comma as the delimiter. So, we'll use **REPLACE()** to substitute the comma with a period.
+
+
+````sql
+Select OwnerAddress from NashvilleHousing;
+````
+
+![NH 4 Uncleaned](https://user-images.githubusercontent.com/96012488/207069442-5fa1df58-d79d-465b-8f05-be73b1467607.png)
+
+
+ Specifying what we want
+
+
+SELECT 
+PARSENAME(REPLACE(OwnerAddress,',','.'),3) Address,
+PARSENAME(REPLACE(OwnerAddress,',','.'),2) City,
+PARSENAME(REPLACE(OwnerAddress,',','.'),1) State
+FROM NashvilleHousing;
+
+
+-- Adding 3 new columns 
+
+
+ALTER TABLE NashvilleHousing
+ADD OwnerAddressNew NVARCHAR(255);
+
+ALTER TABLE NashvilleHousing
+ADD OwnerCity NVARCHAR(255);
+
+ALTER TABLE NashvilleHousing
+ADD OwnerState NVARCHAR(255);
+
+
+-- Filling the 3 columns with relevant values
+
+
+UPDATE NashvilleHousing
+SET OwnerAddressNew = PARSENAME(REPLACE(OwnerAddress,',','.'),3);
+
+UPDATE NashvilleHousing
+SET OwnerCity = PARSENAME(REPLACE(OwnerAddress,',','.'),2);
+
+UPDATE NashvilleHousing 
+SET OwnerState = PARSENAME(REPLACE(OwnerAddress,',','.'),1);
 
 
 
