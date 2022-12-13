@@ -254,13 +254,18 @@ ALTER TABLE NashvilleHousing
 DROP COLUMN PropertyAddress, OwnerAddress, TaxDistrict;
 ````
 
-#### Have a final look at the Cleaned Data
+***
+
+#### ➡️ Have a final look at the Cleaned Data
 
 ````sql
 SELECT * 
 FROM NashvilleHousing; 
 ````
 
+<br />
+
+Now, the data has become more complete and accurate to be used for analysis and generating insights. 
 
 
 
